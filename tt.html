@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Emploi du Temps</title>
+    <link href="https://cdn.jsdelivr.net/npm/fullcalendar@5.11.3/main.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/fullcalendar@5.11.3/main.min.js"></script>
+    <style>
+        body {
+            background: url('https://files.oaiusercontent.com/file-XamR2yMwF1AKNGu1vfSpg3?se=2025-02-23T21%3A05%3A54Z&sp=r&sv=2024-08-04&sr=b&rscc=max-age%3D604800%2C%20immutable%2C%20private&rscd=attachment%3B%20filename%3Dcdd7a50f-066d-44b7-972a-8a83759c52ac.webp&sig=qjl6FeNx/qTwhcH5yb%2BAftp%2BBpW3flFPJToj2fEeeoY%3D') no-repeat center center fixed;
+            background-size: cover;
+            color: white;
+        }
+        #calendar {
+            max-width: 900px;
+            margin: 50px auto;
+            padding: 20px;
+            background: rgba(0, 0, 0, 0.8);
+            border-radius: 10px;
+        }
+        #event-info {
+            text-align: center;
+            margin-top: 20px;
+            font-size: 18px;
+            background: rgba(255, 255, 255, 0.9);
+            color: black;
+            padding: 10px;
+            border-radius: 10px;
+            display: none;
+        }
+    </style>
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            var calendarEl = document.getElementById('calendar');
+            var eventInfoEl = document.getElementById('event-info');
+            var calendar = new FullCalendar.Calendar(calendarEl, {
+                initialView: 'timeGridWeek',
+                locale: 'fr',
+                headerToolbar: {
+                    left: 'prev,next today',
+                    center: 'title',
+                    right: 'dayGridMonth,timeGridWeek,timeGridDay'
+                },
+                events: async function(fetchInfo, successCallback, failureCallback) {
+                    let response = await fetch('https://ade.u-pec.fr/jsp/custom/modules/plannings/anonymous_cal.jsp?data=dfb8841b56e5c4fecd13b6f3f91c57165e6e988f27527a471139f3ef8f53072136205b94d7d29e90e2f5dfbb8890033330a5f72847b0c2c00c79892a4ff650a7453e12405821b7d1e41eb379403bf8e767dc3c4a11bcf6575a35e396998f4a94,1');
+                    let text = await response.text();
+                    let events = parseICS(text);
+                    successCallback(events);
+                },
+                eventClick: function(info) {
+                    let professor = info.event.extendedProps.professor || "Non spécifié";
+                    eventInfoEl.innerHTML = `<strong>${info.event.title}</strong><br>Professeur : ${professor}`;
+                    eventInfoEl.style.display = 'block';
+                }
+            });
+            calendar.render();
+        });
+
+        function parseICS(icsData) {
+            let events = [];
+            let regex = /BEGIN:VEVENT([\s\S]*?)END:VEVENT/g;
+            let matches;
+            while ((matches = regex.exec(icsData)) !== null) {
+                let event = matches[1];
+                let summary = event.match(/SUMMARY:(.*)/)?.[1] || 'Sans titre';
+                let start = event.match(/DTSTART:(\d{8}T\d{6}Z)/)?.[1];
+                let end = event.match(/DTEND:(\d{8}T\d{6}Z)/)?.[1];
+                let location = event.match(/LOCATION:(.*)/)?.[1] || 'Lieu inconnu';
+                let description = event.match(/DESCRIPTION:(?:\\n)?([\s\S]*)/)?.[1] || '';
+                let professor = extractProfessor(description);
+                
+                if (start && end) {
+                    events.push({
+                        title: summary + ' - ' + location,
+                        start: formatICSTime(start),
+                        end: formatICSTime(end),
+                        extendedProps: { professor: professor }
+                    });
+                }
+            }
+            return events;
+        }
+
+        function extractProfessor(description) {
+            let lines = description.split('\\n');
+            for (let line of lines) {
+                if (/^[A-Z][a-z]+(?:-[A-Z][a-z]+)?\s[A-Z][a-z]+(?:-[A-Z][a-z]+)?$/.test(line.trim())) {
+                    return line.trim();
+                }
+            }
+            return "Non spécifié";
+        }
+
+        function formatICSTime(icsTime) {
+            return icsTime.replace(/(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z/, '$1-$2-$3T$4:$5:$6Z');
+        }
+    </script>
+</head>
+<body>
+    <div id="calendar"></div>
+    <div id="event-info"></div>
+</body>
+</html>
